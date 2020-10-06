@@ -1,8 +1,4 @@
-function ConvertTo-FastGitUrl {
-    param (
-        [Parameter(Mandatory = $True)]
-        [string]$Url
-    )
+function ConvertTo-FastGitUrl ($Url) {
     $map = @{
         '//github.com/'                = '//hub.fastgit.org/';
         '//raw.githubusercontent.com/' = '//raw.fastgit.org/'

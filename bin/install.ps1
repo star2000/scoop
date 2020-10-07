@@ -134,11 +134,6 @@ function Test-Prerequisite {
         Deny-Install "Scoop requires 'C:\Windows\System32\Robocopy.exe' to work. Please make sure 'C:\Windows\System32' is in your PATH."
     }
 
-    # Test if scoop is installed, by checking if scoop command exists.
-    if ([bool](Get-Command -Name 'scoop' -ErrorAction SilentlyContinue)) {
-        Remove-Item $SCOOP_CONFIG_FILE -Force -ErrorAction SilentlyContinue | Out-Null
-    }
-
     # Detect if RunAsAdministrator, there is no need to run as administrator when installing Scoop.
     if (!$RunAsAdmin -and (Test-IsAdministrator)) {
         Write-Warning "Are you sure to run as an administrator?"
@@ -151,6 +146,12 @@ function Test-Prerequisite {
                 Deny-Install "Wise choice."
             }
         }
+    }
+
+    # Test if scoop is installed, by checking if scoop command exists.
+    if ([bool](Get-Command -Name 'scoop' -ErrorAction SilentlyContinue)) {
+        'rootPath', 'globalPath', 'cachePath', 'SCOOP_REPO', 'SCOOP_BRANCH' | ForEach-Object { Add-Config $_ $null } | Out-Null
+        $SCOOP_APP_DIR, "$SCOOP_DIR\buckets" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -338,9 +339,8 @@ function Use-Config {
 
 function Add-Config {
     param (
-        [Parameter(Mandatory = $True, Position = 0)]
+        [Parameter(Mandatory = $True)]
         [String] $Name,
-        [Parameter(Mandatory = $True, Position = 1)]
         [String] $Value
     )
 
@@ -365,7 +365,7 @@ function Add-Config {
         $scoopConfig | Add-Member -MemberType NoteProperty -Name $Name -Value $Value
     }
 
-    if ($null -eq $Value) {
+    if (!$Value) {
         $scoopConfig.PSObject.Properties.Remove($Name)
     }
 

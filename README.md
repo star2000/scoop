@@ -25,6 +25,7 @@ scoop help
 	- `默认值`
 	- `可选值1`
 	- `可选值2`
+> 基本选项
 - `proxy`: 代理
 	- `none`
 	- `default`
@@ -52,6 +53,7 @@ scoop help
 - `aria2-options`: 其他aria2选项
     - 无
     - ` --键1=值1 --键2=值2`
+> 开发者选项
 - `debug`: 可被`$env:SCOOP_DEBUG`覆盖
     - `false`
     - `true`
@@ -61,3 +63,16 @@ scoop help
     - `$env:ProgramData\scoop`
 - `cachePath`: 可被`$env:SCOOP_CACHE`覆盖
     - `$rootPath\cache`
+- `SCOOP_REPO`
+	- `https://github.com/star2000/scoop`
+- `SCOOP_BRANCH`
+    - `master`
+- `NO_JUNCTIONS`
+    - `false`
+    - `true`
+- `7ZIPEXTRACT_USE_EXTERNAL`
+    - `false`
+    - `true`
+- `MSIEXTRACT_USE_LESSMSI`
+    - `false`
+    - `true`

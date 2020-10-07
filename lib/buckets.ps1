@@ -82,12 +82,12 @@ function find_manifest($app, $bucket) {
 }
 
 function add_bucket($name, $repo) {
-    $repo = ConvertTo-FastGitUrl $repo
     if (!$name) { "<name> missing"; $usage_add; exit 1 }
     if (!$repo) {
         $repo = known_bucket_repo $name
         if (!$repo) { "Unknown bucket '$name'. Try specifying <repo>."; $usage_add; exit 1 }
     }
+    $repo = ConvertTo-FastGitUrl $repo
 
     if (!(Test-CommandAvailable git)) {
         abort "Git is required for buckets. Run 'scoop install git' and try again."

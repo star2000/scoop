@@ -8,7 +8,7 @@
 ## 安装
 
 ```
-iwr -useb raw.fastgit.org/star2000/scoop/master/bin/install.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor 3072;iwr -useb raw.fastgit.org/star2000/scoop/master/bin/install.ps1 | iex
 ```
 
 ## 用法

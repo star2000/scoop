@@ -123,9 +123,12 @@ function update_scoop() {
     }
 
     if ((Get-LocalBucket) -notcontains 'main') {
-        info "The main bucket of Scoop has been separated to 'https://github.com/ScoopInstaller/Main'"
         info "Adding main bucket..."
         add_bucket 'main'
+    }
+    if ((Get-LocalBucket) -notcontains 'extras') {
+        info "Adding extras bucket..."
+        add_bucket 'extras'
     }
 
     ensure_scoop_in_path
@@ -136,9 +139,9 @@ function update_scoop() {
 
         $loc = Find-BucketDirectory $_ -Root
         # Make sure main bucket, which was downloaded as zip, will be properly "converted" into git
-        if (($_ -eq 'main') -and !(Test-Path "$loc\.git")) {
-            rm_bucket 'main'
-            add_bucket 'main'
+        if (($_ -in ('main', 'extras')) -and !(Test-Path "$loc\.git")) {
+            rm_bucket $_
+            add_bucket $_
         }
 
         Push-Location $loc

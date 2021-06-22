@@ -402,6 +402,12 @@ function Install-Scoop {
         New-Item -Type Directory $SCOOP_MAIN_BUCKET_DIR | Out-Null
     }
     $downloader.downloadFile($SCOOP_MAIN_BUCKET_REPO, $scoopMainZipfile)
+    # 3. download scoop extras bucket
+    $scoopExtrasZipfile = "$SCOOP_EXTRAS_BUCKET_DIR\scoop-extras.zip"
+    if (!(Test-Path $SCOOP_EXTRAS_BUCKET_DIR)) {
+        New-Item -Type Directory $SCOOP_EXTRAS_BUCKET_DIR | Out-Null
+    }
+    $downloader.downloadFile($SCOOP_EXTRAS_BUCKET_REPO, $scoopExtrasZipfile)
 
     # Extract files from downloaded zip
     Write-InstallInfo "Extracting..."
@@ -413,12 +419,18 @@ function Install-Scoop {
     $scoopMainUnzipTempDir = "$SCOOP_MAIN_BUCKET_DIR\_tmp"
     Expand-ZipArchive $scoopMainZipfile $scoopMainUnzipTempDir
     Copy-Item "$scoopMainUnzipTempDir\Main-*\*" $SCOOP_MAIN_BUCKET_DIR -Recurse -Force
+    # 3. extract scoop extras bucket
+    $scoopExtrasUnzipTempDir = "$SCOOP_EXTRAS_BUCKET_DIR\_tmp"
+    Expand-ZipArchive $scoopExtrasZipfile $scoopExtrasUnzipTempDir
+    Copy-Item "$scoopExtrasUnzipTempDir\scoop-apps-*\*" $SCOOP_EXTRAS_BUCKET_DIR -Recurse -Force
 
     # Cleanup
     Remove-Item $scoopUnzipTempDir -Recurse -Force
     Remove-Item $scoopZipfile
     Remove-Item $scoopMainUnzipTempDir -Recurse -Force
     Remove-Item $scoopMainZipfile
+    Remove-Item $scoopExtrasUnzipTempDir -Recurse -Force
+    Remove-Item $scoopExtrasZipfile
 
     # Create the scoop shim
     Write-InstallInfo "Creating shim..."
@@ -469,6 +481,8 @@ $SCOOP_SHIMS_DIR = "$SCOOP_DIR\shims"
 $SCOOP_APP_DIR = "$SCOOP_DIR\apps\scoop\current"
 # Scoop main bucket directory
 $SCOOP_MAIN_BUCKET_DIR = "$SCOOP_DIR\buckets\main"
+# Scoop extras bucket directory
+$SCOOP_EXTRAS_BUCKET_DIR = "$SCOOP_DIR\buckets\extras"
 # Scoop config file location
 $SCOOP_CONFIG_HOME = $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config" | Select-Object -First 1
 $SCOOP_CONFIG_FILE = "$SCOOP_CONFIG_HOME\scoop\config.json"
@@ -476,6 +490,7 @@ $SCOOP_CONFIG_FILE = "$SCOOP_CONFIG_HOME\scoop\config.json"
 # TODO: Use a specific version of Scoop and the main bucket
 $SCOOP_PACKAGE_REPO = ConvertTo-FastGitUrl 'https://github.com/star2000/scoop/archive/master.zip'
 $SCOOP_MAIN_BUCKET_REPO = ConvertTo-FastGitUrl 'https://github.com/ScoopInstaller/Main/archive/master.zip'
+$SCOOP_EXTRAS_BUCKET_REPO = ConvertTo-FastGitUrl 'https://github.com/kkzzhizhou/scoop-apps/archive/master.zip'
 
 
 # Quit if anything goes wrong

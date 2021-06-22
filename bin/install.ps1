@@ -490,7 +490,7 @@ $SCOOP_CONFIG_FILE = "$SCOOP_CONFIG_HOME\scoop\config.json"
 # TODO: Use a specific version of Scoop and the main bucket
 $SCOOP_PACKAGE_REPO = ConvertTo-FastGitUrl 'https://github.com/star2000/scoop/archive/master.zip'
 $SCOOP_MAIN_BUCKET_REPO = ConvertTo-FastGitUrl 'https://github.com/ScoopInstaller/Main/archive/master.zip'
-$SCOOP_EXTRAS_BUCKET_REPO = ConvertTo-FastGitUrl 'https://github.com/kkzzhizhou/scoop-apps/archive/master.zip'
+$SCOOP_EXTRAS_BUCKET_REPO = ConvertTo-FastGitUrl 'https://github.com/star2000/scoop-apps/archive/master.zip'
 
 
 # Quit if anything goes wrong

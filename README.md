@@ -3,7 +3,8 @@
 - 集成`fastgit`，能在墙内更快的下载来自`github`的文件
 - 为了降低`fastgit`的负担，仅在墙内生效，判断依据能否访问`v2ray.com/robots.txt`
 - 增加默认`aria2`下载线程，提高下载速度
-- 安装脚本改自`ScoopInstaller/Install`
+- 安装脚本改自[`ScoopInstaller/Install`](https://github.com/ScoopInstaller/Install/blob/master/install.ps1)
+- 安装时附带了`extras`桶[`star2000/scoop-apps`](https://github.com/star2000/scoop-apps)，聚合了绝大部分scoop桶
 
 ## 安装
 

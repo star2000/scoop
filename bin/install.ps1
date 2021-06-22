@@ -45,8 +45,6 @@
     Specifies credential for the prxoy.
 .PARAMETER ProxyUseDefaultCredentials
     Use the credentials of the current user for the proxy server that is specified by the -Proxy parameter.
-.PARAMETER RunAsAdmin
-    Force to run the installer as administrator.
 .LINK
     https://scoop.sh
 .LINK
@@ -59,8 +57,7 @@ param(
     [Switch] $NoProxy,
     [Uri] $Proxy,
     [System.Management.Automation.PSCredential] $ProxyCredential,
-    [Switch] $ProxyUseDefaultCredentials,
-    [Switch] $RunAsAdmin
+    [Switch] $ProxyUseDefaultCredentials
 )
 
 # Disable StrictMode in this script
@@ -112,12 +109,6 @@ function Test-ValidateParameter {
     }
 }
 
-function Test-IsAdministrator {
-    return ([Security.Principal.WindowsPrincipal]`
-            [Security.Principal.WindowsIdentity]::GetCurrent()`
-    ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
 function Test-Prerequisite {
     # Scoop requires PowerShell 5 at least
     if (($PSVersionTable.PSVersion.Major) -lt 5) {
@@ -132,20 +123,6 @@ function Test-Prerequisite {
     # Ensure Robocopy.exe is accessible
     if (!([bool](Get-Command -Name 'robocopy' -ErrorAction SilentlyContinue))) {
         Deny-Install "Scoop requires 'C:\Windows\System32\Robocopy.exe' to work. Please make sure 'C:\Windows\System32' is in your PATH."
-    }
-
-    # Detect if RunAsAdministrator, there is no need to run as administrator when installing Scoop.
-    if (!$RunAsAdmin -and (Test-IsAdministrator)) {
-        Write-Warning "Are you sure to run as an administrator?"
-        $Readhost = Read-Host " (y/N) "
-        Switch ($ReadHost.ToString().ToLower()) {
-            "y" {
-                Write-Warning "Hope you understand what you are doing."
-            }
-            Default {
-                Deny-Install "Wise choice."
-            }
-        }
     }
 
     # Test if scoop is installed, by checking if scoop command exists.
@@ -384,24 +361,16 @@ function Add-DefaultConfig {
     # Use system SCOOP_GLOBAL, or set system SCOOP_GLOBAL
     # with $env:SCOOP_GLOBAL if RunAsAdmin, otherwise save to globalPath
     if (!(Get-Env 'SCOOP_GLOBAL' -global)) {
-        if ((Test-IsAdministrator) -and $env:SCOOP_GLOBAL) {
-            [Environment]::SetEnvironmentVariable('SCOOP_GLOBAL', $env:SCOOP_GLOBAL, 'Machine')
-        } else {
-            if ($SCOOP_GLOBAL_DIR -ne "$env:ProgramData\scoop") {
-                Add-Config -Name 'globalPath' -Value $SCOOP_GLOBAL_DIR | Out-Null
-            }
+        if ($SCOOP_GLOBAL_DIR -ne "$env:ProgramData\scoop") {
+            Add-Config -Name 'globalPath' -Value $SCOOP_GLOBAL_DIR | Out-Null
         }
     }
 
     # Use system SCOOP_CACHE, or set system SCOOP_CACHE
     # with $env:SCOOP_CACHE if RunAsAdmin, otherwise save to cachePath
     if (!(Get-Env 'SCOOP_CACHE' -global)) {
-        if ((Test-IsAdministrator) -and $env:SCOOP_CACHE) {
-            [Environment]::SetEnvironmentVariable('SCOOP_CACHE', $env:SCOOP_CACHE, 'Machine')
-        } else {
-            if ($SCOOP_CACHE_DIR -ne "$SCOOP_DIR\cache") {
-                Add-Config -Name 'cachePath' -Value $SCOOP_CACHE_DIR | Out-Null
-            }
+        if ($SCOOP_CACHE_DIR -ne "$SCOOP_DIR\cache") {
+            Add-Config -Name 'cachePath' -Value $SCOOP_CACHE_DIR | Out-Null
         }
     }
 

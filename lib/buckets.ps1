@@ -70,6 +70,10 @@ function Get-LocalBucket {
                 $bucketNames.Insert(0, $name)
             }
         }
+        if ($bucketNames.Contains('main')) {
+            [void]$bucketNames.Remove('main')
+            $bucketNames.Insert(0, 'main')
+        }
         return $bucketNames
     }
 }
@@ -95,7 +99,7 @@ function Convert-RepositoryUri {
             $Matches.provider, $Matches.user, $Matches.repo -join '/'
         } else {
             error "$Uri is not a valid Git URL!"
-            error "Please see https://git-scm.com/docs/git-clone#_git_urls for valid ones."
+            error 'Please see https://git-scm.com/docs/git-clone#_git_urls for valid ones.'
             return $null
         }
     }
@@ -114,10 +118,10 @@ function list_buckets {
             $bucket.Updated = (Get-Item "$path\bucket" -ErrorAction SilentlyContinue).LastWriteTime
         }
         $bucket.Manifests = Get-ChildItem "$path\bucket" -Force -Recurse -ErrorAction SilentlyContinue |
-                Measure-Object | Select-Object -ExpandProperty Count
+        Measure-Object | Select-Object -ExpandProperty Count
         $buckets += [PSCustomObject]$bucket
     }
-    ,$buckets
+    , $buckets
 }
 
 function add_bucket($name, $repo) {
@@ -132,6 +136,7 @@ function add_bucket($name, $repo) {
         return 2
     }
 
+    $repo = ConvertTo-MirrorUrl $repo
     $uni_repo = Convert-RepositoryUri -Uri $repo
     if ($null -eq $uni_repo) {
         return 1
@@ -154,7 +159,7 @@ function add_bucket($name, $repo) {
     }
     ensure $bucketsdir | Out-Null
     $dir = ensure $dir
-    Invoke-Git -ArgumentList @('clone', $repo, $dir, '-q')
+    Invoke-Git -ArgumentList @('clone', $repo, $dir, '-q', '--depth=1')
     Write-Host 'OK'
     success "The $name bucket was added successfully."
     return 0

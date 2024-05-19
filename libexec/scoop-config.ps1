@@ -30,7 +30,7 @@
 # no_junction: $true|$false
 #       The 'current' version alias will not be used. Shims and shortcuts will point to specific version instead.
 #
-# scoop_repo: http://github.com/ScoopInstaller/Scoop
+# scoop_repo: https://github.com/star2000/scoop
 #       Git repository containining scoop source code.
 #       This configuration is useful for custom forks.
 #
@@ -133,15 +133,15 @@
 #       Number of seconds to wait between retries.
 #       See: 'https://aria2.github.io/manual/en/html/aria2c.html#cmdoption-retry-wait'
 #
-# aria2-split: 5
+# aria2-split: 1024
 #       Number of connections used for downlaod.
 #       See: 'https://aria2.github.io/manual/en/html/aria2c.html#cmdoption-s'
 #
-# aria2-max-connection-per-server: 5
+# aria2-max-connection-per-server: 16
 #       The maximum number of connections to one server for each download.
 #       See: 'https://aria2.github.io/manual/en/html/aria2c.html#cmdoption-x'
 #
-# aria2-min-split-size: 5M
+# aria2-min-split-size: 1M
 #       Downloaded files will be splitted by this configured size and downloaded using multiple connections.
 #       See: 'https://aria2.github.io/manual/en/html/aria2c.html#cmdoption-k'
 #
@@ -163,7 +163,7 @@ if (!$name) {
     Write-Host "'$name' has been set to '$value'"
 } else {
     $value = get_config $name
-    if($null -eq $value) {
+    if ($null -eq $value) {
         Write-Host "'$name' is not set"
     } else {
         if ($value -is [System.DateTime]) {

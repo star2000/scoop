@@ -564,6 +564,16 @@ function Install-Scoop {
     # Enable TLS 1.2
     Optimize-SecurityProtocol
 
+    if (Test-Path $SCOOP_APP_DIR) {
+        Remove-Item $SCOOP_APP_DIR -Recurse -Force | Out-Null
+    }
+    if (Test-Path $SCOOP_MAIN_BUCKET_DIR) {
+        Remove-Item $SCOOP_MAIN_BUCKET_DIR -Recurse -Force | Out-Null
+    }
+    if (Test-Path $SCOOP_APPS_BUCKET_DIR) {
+        Remove-Item $SCOOP_APPS_BUCKET_DIR -Recurse -Force | Out-Null
+    }
+
     # Download scoop from GitHub
     Write-InstallInfo 'Downloading...'
     $downloader = Get-Downloader
@@ -579,12 +589,17 @@ function Install-Scoop {
                 $Env:HTTPS_PROXY = $downloader.Proxy.Address
             }
             Write-Verbose "Cloning $SCOOP_PACKAGE_GIT_REPO to $SCOOP_APP_DIR"
-            git clone -q $SCOOP_PACKAGE_GIT_REPO $SCOOP_APP_DIR
+            git clone -q --depth=1 $SCOOP_PACKAGE_GIT_REPO $SCOOP_APP_DIR
             if (-Not $?) {
                 throw 'Cloning failed. Falling back to downloading zip files.'
             }
             Write-Verbose "Cloning $SCOOP_MAIN_BUCKET_GIT_REPO to $SCOOP_MAIN_BUCKET_DIR"
-            git clone -q $SCOOP_MAIN_BUCKET_GIT_REPO $SCOOP_MAIN_BUCKET_DIR
+            git clone -q --depth=1 $SCOOP_MAIN_BUCKET_GIT_REPO $SCOOP_MAIN_BUCKET_DIR
+            if (-Not $?) {
+                throw 'Cloning failed. Falling back to downloading zip files.'
+            }
+            Write-Verbose "Cloning $SCOOP_APPS_BUCKET_GIT_REPO to $SCOOP_APPS_BUCKET_DIR"
+            git clone -q --depth=1 $SCOOP_APPS_BUCKET_GIT_REPO $SCOOP_APPS_BUCKET_DIR
             if (-Not $?) {
                 throw 'Cloning failed. Falling back to downloading zip files.'
             }
@@ -613,6 +628,13 @@ function Install-Scoop {
         }
         Write-Verbose "Downloading $SCOOP_MAIN_BUCKET_REPO to $scoopMainZipfile"
         $downloader.downloadFile($SCOOP_MAIN_BUCKET_REPO, $scoopMainZipfile)
+        # 3. download scoop apps bucket
+        $scoopAppsZipfile = "$SCOOP_APPS_BUCKET_DIR\scoop-apps.zip"
+        if (!(Test-Path $SCOOP_APPS_BUCKET_DIR)) {
+            New-Item -Type Directory $SCOOP_APPS_BUCKET_DIR | Out-Null
+        }
+        Write-Verbose "Downloading $SCOOP_APPS_BUCKET_REPO to $scoopAppsZipfile"
+        $downloader.downloadFile($SCOOP_APPS_BUCKET_REPO, $scoopAppsZipfile)
 
         # Extract files from downloaded zip
         Write-InstallInfo 'Extracting...'
@@ -626,12 +648,19 @@ function Install-Scoop {
         Write-Verbose "Extracting $scoopMainZipfile to $scoopMainUnzipTempDir"
         Expand-ZipArchive $scoopMainZipfile $scoopMainUnzipTempDir
         Copy-Item "$scoopMainUnzipTempDir\Main-*\*" $SCOOP_MAIN_BUCKET_DIR -Recurse -Force
+        # 3. extract scoop apps bucket
+        $scoopAppsUnzipTempDir = "$SCOOP_APPS_BUCKET_DIR\_tmp"
+        Write-Verbose "Extracting $scoopAppsZipfile to $scoopAppsUnzipTempDir"
+        Expand-ZipArchive $scoopAppsZipfile $scoopAppsUnzipTempDir
+        Copy-Item "$scoopAppsUnzipTempDir\Apps-*\*" $SCOOP_APPS_BUCKET_DIR -Recurse -Force
 
         # Cleanup
         Remove-Item $scoopUnzipTempDir -Recurse -Force
         Remove-Item $scoopZipfile
         Remove-Item $scoopMainUnzipTempDir -Recurse -Force
         Remove-Item $scoopMainZipfile
+        Remove-Item $scoopAppsUnzipTempDir -Recurse -Force
+        Remove-Item $scoopAppsZipfile
     }
     # Create the scoop shim
     Import-ScoopShim
@@ -662,6 +691,31 @@ function Write-DebugInfo {
     Write-Verbose "SCOOP_CONFIG_HOME: $SCOOP_CONFIG_HOME"
 }
 
+function ConvertTo-MirrorUrl ($Url) {
+    $map = @{
+        '//github.com/'                = '//mirror.ghproxy.com/https://github.com/';
+        '//raw.githubusercontent.com/' = '//mirror.ghproxy.com/https://raw.githubusercontent.com/'
+    }
+    if ($map.Keys | Where-Object { $Url -match $_ }) {
+        if ($null -eq $env:SCOOP_INGFW) {
+            try {
+                Invoke-WebRequest 'https://v2ray.com/robots.txt' -UseBasicParsing -TimeoutSec 3 | Out-Null
+                $env:SCOOP_INGFW = 'false'
+                $is = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\'
+                if ($is.ProxyEnable) {
+                    $env:http_proxy = $env:https_proxy = $is.ProxyServer
+                }
+            } catch {
+                $env:SCOOP_INGFW = 'true'
+            }
+        }
+        if ($env:SCOOP_INGFW -eq 'true') {
+            $map.Keys | ForEach-Object { $Url = $Url -replace $_, $map[$_] }
+        }
+    }
+    return $Url
+}
+
 # Prepare variables
 $IS_EXECUTED_FROM_IEX = ($null -eq $MyInvocation.MyCommand.Path)
 
@@ -677,16 +731,20 @@ $SCOOP_SHIMS_DIR = "$SCOOP_DIR\shims"
 $SCOOP_APP_DIR = "$SCOOP_DIR\apps\scoop\current"
 # Scoop main bucket directory
 $SCOOP_MAIN_BUCKET_DIR = "$SCOOP_DIR\buckets\main"
+# Scoop apps bucket directory
+$SCOOP_APPS_BUCKET_DIR = "$SCOOP_DIR\buckets\apps"
 # Scoop config file location
 $SCOOP_CONFIG_HOME = $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config" | Select-Object -First 1
 $SCOOP_CONFIG_FILE = "$SCOOP_CONFIG_HOME\scoop\config.json"
 
 # TODO: Use a specific version of Scoop and the main bucket
-$SCOOP_PACKAGE_REPO = 'https://github.com/ScoopInstaller/Scoop/archive/master.zip'
-$SCOOP_MAIN_BUCKET_REPO = 'https://github.com/ScoopInstaller/Main/archive/master.zip'
+$SCOOP_PACKAGE_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop/archive/master.zip'
+$SCOOP_MAIN_BUCKET_REPO = ConvertTo-MirrorUrl 'https://github.com/ScoopInstaller/Main/archive/master.zip'
+$SCOOP_APPS_BUCKET_REPO = ConvertTo-MirrorUrl 'https://github.com/kkzzhizhou/scoop-apps/archive/master.zip'
 
-$SCOOP_PACKAGE_GIT_REPO = 'https://github.com/ScoopInstaller/Scoop.git'
-$SCOOP_MAIN_BUCKET_GIT_REPO = 'https://github.com/ScoopInstaller/Main.git'
+$SCOOP_PACKAGE_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop.git'
+$SCOOP_MAIN_BUCKET_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/ScoopInstaller/Main.git'
+$SCOOP_APPS_BUCKET_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/kkzzhizhou/scoop-apps.git'
 
 # Quit if anything goes wrong
 $oldErrorActionPreference = $ErrorActionPreference

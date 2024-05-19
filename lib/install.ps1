@@ -198,9 +198,9 @@ function Invoke-CachedAria2Download ($app, $version, $manifest, $architecture, $
         '--allow-overwrite=true'
         '--auto-file-renaming=false'
         "--retry-wait=$(get_config 'aria2-retry-wait' 2)"
-        "--split=$(get_config 'aria2-split' 5)"
-        "--max-connection-per-server=$(get_config 'aria2-max-connection-per-server' 5)"
-        "--min-split-size=$(get_config 'aria2-min-split-size' '5M')"
+        "--split=$(get_config 'aria2-split' 1024)"
+        "--max-connection-per-server=$(get_config 'aria2-max-connection-per-server' 16)"
+        "--min-split-size=$(get_config 'aria2-min-split-size' '1M')"
         '--console-log-level=warn'
         '--enable-color=false'
         '--no-conf=true'
@@ -256,7 +256,7 @@ function Invoke-CachedAria2Download ($app, $version, $manifest, $architecture, $
                     warn 'Token might be misconfigured.'
                 }
             }
-            $urlstxt_content += "$try_url`n"
+            $urlstxt_content += "$(ConvertTo-MirrorUrl $try_url)`n"
             if (!$url.Contains('sourceforge.net')) {
                 $urlstxt_content += "    referer=$(strip_filename $url)`n"
             }
@@ -367,6 +367,7 @@ function Invoke-CachedAria2Download ($app, $version, $manifest, $architecture, $
 # download with filesize and progress indicator
 function Invoke-Download ($url, $to, $cookies, $progress) {
     $reqUrl = ($url -split '#')[0]
+    $reqUrl = ConvertTo-MirrorUrl $reqUrl
     $wreq = [Net.WebRequest]::Create($reqUrl)
     if ($wreq -is [Net.HttpWebRequest]) {
         $wreq.UserAgent = Get-UserAgent

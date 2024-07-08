@@ -28,7 +28,8 @@ function Get-SQLite {
         Write-Host "Extracting SQLite $Version..." -ForegroundColor DarkYellow -NoNewline
         Expand-Archive -Path $sqlitePkgPath -DestinationPath $sqliteTempPath -Force
         New-Item -Path $sqlitePath -ItemType Directory -Force | Out-Null
-        Move-Item -Path "$sqliteTempPath\build\net45\*" -Destination $sqlitePath -Exclude '*.targets' -Force
+        Remove-Item -Path "$sqliteTempPath\build\net45\*.targets" -Force
+        Move-Item -Path "$sqliteTempPath\build\net45\*" -Destination $sqlitePath -Force
         Move-Item -Path "$sqliteTempPath\lib\net45\System.Data.SQLite.dll" -Destination $sqlitePath -Force
         Remove-Item -Path $sqlitePkgPath, $sqliteTempPath -Recurse -Force
         Write-Host ' Done' -ForegroundColor DarkYellow

@@ -21,7 +21,7 @@ function Get-SQLite {
     # Install SQLite
     try {
         Write-Host "Downloading SQLite $Version..." -ForegroundColor DarkYellow
-        $sqlitePkgPath = "$env:TEMP\sqlite.nupkg"
+        $sqlitePkgPath = "$env:TEMP\sqlite.nupkg.zip"
         $sqliteTempPath = "$env:TEMP\sqlite"
         $sqlitePath = "$PSScriptRoot\..\supporting\sqlite"
         Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/stub.system.data.sqlite.core.netframework/$version/stub.system.data.sqlite.core.netframework.$version.nupkg" -OutFile $sqlitePkgPath

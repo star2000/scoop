@@ -19,6 +19,11 @@
 #     scoop bucket known
 param($cmd, $name, $repo)
 
+if (get_config USE_SQLITE_CACHE $true) {
+    . "$PSScriptRoot\..\lib\manifest.ps1"
+    . "$PSScriptRoot\..\lib\database.ps1"
+}
+
 $usage_add = 'usage: scoop bucket add <name> [<repo>]'
 $usage_rm = 'usage: scoop bucket rm <name>'
 

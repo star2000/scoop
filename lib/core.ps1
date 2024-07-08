@@ -241,6 +241,16 @@ function Complete-ConfigChange {
             }
         }
     }
+
+    if ($Name -eq 'use_sqlite_cache' -and $Value -eq $true) {
+        if ((Get-DefaultArchitecture) -eq 'arm64') {
+            abort 'SQLite cache is not supported on ARM64 platform.'
+        }
+        . "$PSScriptRoot\..\lib\database.ps1"
+        . "$PSScriptRoot\..\lib\manifest.ps1"
+        info 'Initializing SQLite cache in progress... This may take a while, please wait.'
+        Set-ScoopDB
+    }
 }
 
 function setup_proxy() {
@@ -339,10 +349,6 @@ function Invoke-GitLog {
 # helper functions
 function coalesce($a, $b) { if ($a) { return $a } $b }
 
-function format($str, $hash) {
-    $hash.keys | ForEach-Object { Set-Variable $_ $hash[$_] }
-    $executionContext.invokeCommand.expandString($str)
-}
 function is_admin {
     $admin = [security.principal.windowsbuiltinrole]::administrator
     $id = [security.principal.windowsidentity]::getcurrent()
@@ -424,7 +430,22 @@ function currentdir($app, $global) {
 function persistdir($app, $global) { "$(basedir $global)\persist\$app" }
 function usermanifestsdir { "$(basedir)\workspace" }
 function usermanifest($app) { "$(usermanifestsdir)\$app.json" }
-function cache_path($app, $version, $url) { "$cachedir\$app#$version#$($url -replace '[^\w\.\-]+', '_')" }
+function cache_path($app, $version, $url) {
+    $underscoredUrl = $url -replace '[^\w\.\-]+', '_'
+    $filePath = "$cachedir\$app#$version#$underscoredUrl"
+
+    # NOTE: Scoop cache files migration. Remove this 6 months after the feature ships.
+    if (Test-Path $filePath) {
+        return $filePath
+    }
+
+    $urlStream = [System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes($url))
+    $sha = (Get-FileHash -Algorithm SHA256 -InputStream $urlStream).Hash.ToLower().Substring(0, 7)
+    $extension = [System.IO.Path]::GetExtension($url)
+    $filePath = $filePath -replace "$underscoredUrl", "$sha$extension"
+
+    return $filePath
+}
 
 # apps
 function sanitary_path($path) { return [regex]::replace($path, '[/\\?:*<>|]', '') }
@@ -502,7 +523,7 @@ function Get-HelperPath {
     [OutputType([String])]
     param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-        [ValidateSet('Git', '7zip', 'Lessmsi', 'Innounp', 'Dark', 'Aria2', 'Zstd')]
+        [ValidateSet('Git', '7zip', 'Lessmsi', 'Innounp', 'Dark', 'Aria2')]
         [String]
         $Helper
     )
@@ -516,12 +537,17 @@ function Get-HelperPath {
                 if ($internalgit) {
                     $HelperPath = $internalgit
                 } else {
-                    $HelperPath = (Get-Command git -ErrorAction Ignore).Source
+                    $HelperPath = (Get-Command git -CommandType Application -TotalCount 1 -ErrorAction Ignore).Source
                 }
             }
             '7zip' { $HelperPath = Get-AppFilePath '7zip' '7z.exe' }
             'Lessmsi' { $HelperPath = Get-AppFilePath 'lessmsi' 'lessmsi.exe' }
-            'Innounp' { $HelperPath = Get-AppFilePath 'innounp' 'innounp.exe' }
+            'Innounp' {
+                $HelperPath = Get-AppFilePath 'innounp-unicode' 'innounp.exe'
+                if ([String]::IsNullOrEmpty($HelperPath)) {
+                    $HelperPath = Get-AppFilePath 'innounp' 'innounp.exe'
+                }
+            }
             'Dark' {
                 $HelperPath = Get-AppFilePath 'wixtoolset' 'wix.exe'
                 if ([String]::IsNullOrEmpty($HelperPath)) {
@@ -529,7 +555,6 @@ function Get-HelperPath {
                 }
             }
             'Aria2' { $HelperPath = Get-AppFilePath 'aria2' 'aria2c.exe' }
-            'Zstd' { $HelperPath = Get-AppFilePath 'zstd' 'zstd.exe' }
         }
 
         return $HelperPath
@@ -576,7 +601,7 @@ function Test-HelperInstalled {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-        [ValidateSet('7zip', 'Lessmsi', 'Innounp', 'Dark', 'Aria2', 'Zstd')]
+        [ValidateSet('7zip', 'Lessmsi', 'Innounp', 'Dark', 'Aria2')]
         [String]
         $Helper
     )
@@ -1038,19 +1063,20 @@ function shim($path, $global, $name, $arg) {
         warn_on_overwrite "$shim.cmd" $path
         @(
             "@rem $resolved_path",
-            "@cd /d $(Split-Path $resolved_path -Parent)"
-            "@java -jar `"$resolved_path`" $arg %*"
+            "@pushd $(Split-Path $resolved_path -Parent)",
+            "@java -jar `"$resolved_path`" $arg %*",
+            '@popd'
         ) -join "`r`n" | Out-UTF8File "$shim.cmd"
 
         warn_on_overwrite $shim $path
         @(
             '#!/bin/sh',
             "# $resolved_path",
-            "if [ `$(echo `$WSL_DISTRO_NAME) ]",
+            "if [ `$WSL_INTEROP ]",
             'then',
             "  cd `$(wslpath -u '$(Split-Path $resolved_path -Parent)')",
             'else',
-            "  cd `"$((Split-Path $resolved_path -Parent).Replace('\', '/'))`"",
+            "  cd `$(cygpath -u '$(Split-Path $resolved_path -Parent)')",
             'fi',
             "java.exe -jar `"$resolved_path`" $arg `"$@`""
         ) -join "`n" | Out-UTF8File $shim -NoNewLine
@@ -1071,14 +1097,22 @@ function shim($path, $global, $name, $arg) {
         warn_on_overwrite "$shim.cmd" $path
         @(
             "@rem $resolved_path",
-            "@bash `"$resolved_path`" $arg %*"
+            "@bash `"`$(wslpath -u '$resolved_path')`" $arg %* 2>nul",
+            '@if %errorlevel% neq 0 (',
+            "  @bash `"`$(cygpath -u '$resolved_path')`" $arg %* 2>nul",
+            ')'
         ) -join "`r`n" | Out-UTF8File "$shim.cmd"
 
         warn_on_overwrite $shim $path
         @(
             '#!/bin/sh',
             "# $resolved_path",
-            "`"$resolved_path`" $arg `"$@`""
+            "if [ `$WSL_INTEROP ]",
+            'then',
+            "  `"`$(wslpath -u '$resolved_path')`" $arg `"$@`"",
+            'else',
+            "  `"`$(cygpath -u '$resolved_path')`" $arg `"$@`"",
+            'fi'
         ) -join "`n" | Out-UTF8File $shim -NoNewLine
     }
 }
@@ -1197,7 +1231,7 @@ function applist($apps, $global) {
 }
 
 function parse_app([string]$app) {
-    if ($app -match '^(?:(?<bucket>[a-zA-Z0-9-_.]+)/)?(?<app>.*\.json$|[a-zA-Z0-9-_.]+)(?:@(?<version>.*))?$') {
+    if ($app -match '^(?:(?<bucket>[a-zA-Z0-9-_.]+)/)?(?<app>.*\.json|[a-zA-Z0-9-_.]+)(?:@(?<version>.*))?$') {
         return $Matches['app'], $Matches['bucket'], $Matches['version']
     } else {
         return $app, $null, $null

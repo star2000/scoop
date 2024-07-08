@@ -6,13 +6,13 @@
 # You can use '*' in place of <app> to update all apps.
 #
 # Options:
-#   -f, --force               Force update even when there isn't a newer version
-#   -g, --global              Update a globally installed app
-#   -i, --independent         Don't install dependencies automatically
-#   -k, --no-cache            Don't use the download cache
-#   -s, --skip                Skip hash validation (use with caution!)
-#   -q, --quiet               Hide extraneous messages
-#   -a, --all                 Update all apps (alternative to '*')
+#   -f, --force            Force update even when there isn't a newer version
+#   -g, --global           Update a globally installed app
+#   -i, --independent      Don't install dependencies automatically
+#   -k, --no-cache         Don't use the download cache
+#   -s, --skip-hash-check  Skip hash validation (use with caution!)
+#   -q, --quiet            Hide extraneous messages
+#   -a, --all              Update all apps (alternative to '*')
 
 . "$PSScriptRoot\..\lib\getopt.ps1"
 . "$PSScriptRoot\..\lib\json.ps1" # 'save_install_info' in 'manifest.ps1' (indirectly)
@@ -24,12 +24,15 @@
 . "$PSScriptRoot\..\lib\versions.ps1"
 . "$PSScriptRoot\..\lib\depends.ps1"
 . "$PSScriptRoot\..\lib\install.ps1"
+if (get_config USE_SQLITE_CACHE $true) {
+    . "$PSScriptRoot\..\lib\database.ps1"
+}
 
-$opt, $apps, $err = getopt $args 'gfiksqa' 'global', 'force', 'independent', 'no-cache', 'skip', 'quiet', 'all'
+$opt, $apps, $err = getopt $args 'gfiksqa' 'global', 'force', 'independent', 'no-cache', 'skip-hash-check', 'quiet', 'all'
 if ($err) { "scoop update: $err"; exit 1 }
 $global = $opt.g -or $opt.global
 $force = $opt.f -or $opt.force
-$check_hash = !($opt.s -or $opt.skip)
+$check_hash = !($opt.s -or $opt.'skip-hash-check')
 $use_cache = !($opt.k -or $opt.'no-cache')
 $quiet = $opt.q -or $opt.quiet
 $independent = $opt.i -or $opt.independent
@@ -181,31 +184,79 @@ function Sync-Bucket {
 
     $buckets | Where-Object { !$_.valid } | ForEach-Object { Write-Host "'$($_.name)' is not a git repository. Skipped." }
 
+    $updatedFiles = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
+    $removedFiles = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
     if ($PSVersionTable.PSVersion.Major -ge 7) {
         # Parallel parameter is available since PowerShell 7
         $buckets | Where-Object { $_.valid } | ForEach-Object -ThrottleLimit 5 -Parallel {
             . "$using:PSScriptRoot\..\lib\core.ps1"
+            . "$using:PSScriptRoot\..\lib\buckets.ps1"
 
-            $bucketLoc = $_.path
             $name = $_.name
+            $bucketLoc = $_.path
+            $innerBucketLoc = Find-BucketDirectory $name
 
             $previousCommit = Invoke-Git -Path $bucketLoc -ArgumentList @('rev-parse', 'HEAD')
             Invoke-Git -Path $bucketLoc -ArgumentList @('pull', '-q')
             if ($using:Log) {
                 Invoke-GitLog -Path $bucketLoc -Name $name -CommitHash $previousCommit
             }
+            if (get_config USE_SQLITE_CACHE $true) {
+                Invoke-Git -Path $bucketLoc -ArgumentList @('diff', '--name-status', $previousCommit) | ForEach-Object {
+                    $status, $file = $_ -split '\s+', 2
+                    $filePath = Join-Path $bucketLoc $file
+                    if ($filePath -match "^$([regex]::Escape($innerBucketLoc)).*\.json$") {
+                        switch ($status) {
+                            { $_ -in 'A', 'M', 'R' } {
+                                [void]($using:updatedFiles).Add($filePath)
+                            }
+                            'D' {
+                                [void]($using:removedFiles).Add([pscustomobject]@{
+                                        Name   = ([System.IO.FileInfo]$file).BaseName
+                                        Bucket = $name
+                                    })
+                            }
+                        }
+                    }
+                }
+            }
         }
     } else {
         $buckets | Where-Object { $_.valid } | ForEach-Object {
-            $bucketLoc = $_.path
             $name = $_.name
+            $bucketLoc = $_.path
+            $innerBucketLoc = Find-BucketDirectory $name
 
             $previousCommit = Invoke-Git -Path $bucketLoc -ArgumentList @('rev-parse', 'HEAD')
             Invoke-Git -Path $bucketLoc -ArgumentList @('pull', '-q')
             if ($Log) {
                 Invoke-GitLog -Path $bucketLoc -Name $name -CommitHash $previousCommit
             }
+            if (get_config USE_SQLITE_CACHE $true) {
+                Invoke-Git -Path $bucketLoc -ArgumentList @('diff', '--name-status', $previousCommit) | ForEach-Object {
+                    $status, $file = $_ -split '\s+', 2
+                    $filePath = Join-Path $bucketLoc $file
+                    if ($filePath -match "^$([regex]::Escape($innerBucketLoc)).*\.json$") {
+                        switch ($status) {
+                            { $_ -in 'A', 'M', 'R' } {
+                                [void]($updatedFiles).Add($filePath)
+                            }
+                            'D' {
+                                [void]($removedFiles).Add([pscustomobject]@{
+                                        Name   = ([System.IO.FileInfo]$file).BaseName
+                                        Bucket = $name
+                                    })
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+    if ((get_config USE_SQLITE_CACHE $true) -and ($updatedFiles.Count -gt 0 -or $removedFiles.Count -gt 0)) {
+        info 'Updating cache...'
+        Set-ScoopDB -Path $updatedFiles
+        $removedFiles | Remove-ScoopDBItem
     }
 }
 
@@ -292,7 +343,7 @@ function update($app, $global, $quiet = $false, $independent, $suggested, $use_c
     Invoke-HookScript -HookType 'pre_uninstall' -Manifest $old_manifest -Arch $architecture
 
     Write-Host "Uninstalling '$app' ($old_version)"
-    run_uninstaller $old_manifest $architecture $dir
+    Invoke-Installer -Path $dir -Manifest $old_manifest -ProcessorArchitecture $architecture -Uninstall
     rm_shims $app $old_manifest $global $architecture
 
     # If a junction was used during install, that will have been used
@@ -411,7 +462,7 @@ if (-not ($apps -or $all)) {
         }
     }
 
-    $suggested = @{};
+    $suggested = @{}
     # $outdated is a list of ($app, $global) tuples
     $outdated | ForEach-Object { update @_ $quiet $independent $suggested $use_cache $check_hash }
 }

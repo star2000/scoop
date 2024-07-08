@@ -161,6 +161,10 @@ function add_bucket($name, $repo) {
     $dir = ensure $dir
     Invoke-Git -ArgumentList @('clone', $repo, $dir, '-q', '--depth=1')
     Write-Host 'OK'
+    if (get_config USE_SQLITE_CACHE $true) {
+        info 'Updating cache...'
+        Set-ScoopDB -Path (Get-ChildItem (Find-BucketDirectory $name) -Filter '*.json' -Recurse).FullName
+    }
     success "The $name bucket was added successfully."
     return 0
 }
@@ -173,6 +177,11 @@ function rm_bucket($name) {
     }
 
     Remove-Item $dir -Recurse -Force -ErrorAction Stop
+    if (get_config USE_SQLITE_CACHE $true) {
+        info 'Updating cache...'
+        Remove-ScoopDBItem -Bucket $name
+    }
+    success "The $name bucket was removed successfully."
     return 0
 }
 

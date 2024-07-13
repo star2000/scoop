@@ -6,12 +6,13 @@ function ConvertTo-MirrorUrl ($Url) {
     if ($map.Keys | Where-Object { $Url -match $_ }) {
         if ($null -eq $env:SCOOP_INGFW) {
             try {
-                Invoke-WebRequest 'https://v2ray.com/robots.txt' -UseBasicParsing -TimeoutSec 3 | Out-Null
-                $env:SCOOP_INGFW = 'false'
                 $is = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\'
                 if ($is.ProxyEnable) {
-                    $env:http_proxy = $env:https_proxy = $is.ProxyServer
+                    $is.ProxyServer -match '[0-9\.:]+' | Out-Null
+                    $env:http_proxy = $env:https_proxy = 'http://' + $Matches[0]
                 }
+                Invoke-WebRequest 'https://v2ray.com/robots.txt' -UseBasicParsing -TimeoutSec 3 | Out-Null
+                $env:SCOOP_INGFW = 'false'
             } catch {
                 $env:SCOOP_INGFW = 'true'
             }

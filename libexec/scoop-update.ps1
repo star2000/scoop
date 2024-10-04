@@ -24,7 +24,7 @@
 . "$PSScriptRoot\..\lib\versions.ps1"
 . "$PSScriptRoot\..\lib\depends.ps1"
 . "$PSScriptRoot\..\lib\install.ps1"
-if (get_config USE_SQLITE_CACHE $true) {
+if (get_config USE_SQLITE_CACHE) {
     . "$PSScriptRoot\..\lib\database.ps1"
 }
 
@@ -162,11 +162,11 @@ function Sync-Bucket {
         if (!(Test-Path (Join-Path (Find-BucketDirectory $bucket -Root) '.git'))) {
             info "Converting '$bucket' bucket to git repo..."
             $status = rm_bucket $bucket
-            if ($status -ne 0) {
+        if ($status -ne 0) {
                 abort "Failed to remove local '$bucket' bucket."
-            }
+        }
             $status = add_bucket $bucket (known_bucket_repo $bucket)
-            if ($status -ne 0) {
+        if ($status -ne 0) {
                 abort "Failed to add remote '$bucket' bucket."
             }
         }
@@ -201,7 +201,7 @@ function Sync-Bucket {
             if ($using:Log) {
                 Invoke-GitLog -Path $bucketLoc -Name $name -CommitHash $previousCommit
             }
-            if (get_config USE_SQLITE_CACHE $true) {
+            if (get_config USE_SQLITE_CACHE) {
                 Invoke-Git -Path $bucketLoc -ArgumentList @('diff', '--name-status', $previousCommit) | ForEach-Object {
                     $status, $file = $_ -split '\s+', 2
                     $filePath = Join-Path $bucketLoc $file
@@ -232,7 +232,7 @@ function Sync-Bucket {
             if ($Log) {
                 Invoke-GitLog -Path $bucketLoc -Name $name -CommitHash $previousCommit
             }
-            if (get_config USE_SQLITE_CACHE $true) {
+            if (get_config USE_SQLITE_CACHE) {
                 Invoke-Git -Path $bucketLoc -ArgumentList @('diff', '--name-status', $previousCommit) | ForEach-Object {
                     $status, $file = $_ -split '\s+', 2
                     $filePath = Join-Path $bucketLoc $file
@@ -253,7 +253,7 @@ function Sync-Bucket {
             }
         }
     }
-    if ((get_config USE_SQLITE_CACHE $true) -and ($updatedFiles.Count -gt 0 -or $removedFiles.Count -gt 0)) {
+    if ((get_config USE_SQLITE_CACHE) -and ($updatedFiles.Count -gt 0 -or $removedFiles.Count -gt 0)) {
         info 'Updating cache...'
         Set-ScoopDB -Path $updatedFiles
         $removedFiles | Remove-ScoopDBItem

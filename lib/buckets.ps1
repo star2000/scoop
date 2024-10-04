@@ -99,7 +99,7 @@ function Convert-RepositoryUri {
             $Matches.provider, $Matches.user, $Matches.repo -join '/'
         } else {
             error "$Uri is not a valid Git URL!"
-            error 'Please see https://git-scm.com/docs/git-clone#_git_urls for valid ones.'
+            error "Please see https://git-scm.com/docs/git-clone#_git_urls for valid ones."
             return $null
         }
     }
@@ -118,10 +118,10 @@ function list_buckets {
             $bucket.Updated = (Get-Item "$path\bucket" -ErrorAction SilentlyContinue).LastWriteTime
         }
         $bucket.Manifests = Get-ChildItem "$path\bucket" -Force -Recurse -ErrorAction SilentlyContinue |
-        Measure-Object | Select-Object -ExpandProperty Count
+                Measure-Object | Select-Object -ExpandProperty Count
         $buckets += [PSCustomObject]$bucket
     }
-    , $buckets
+    ,$buckets
 }
 
 function add_bucket($name, $repo) {
@@ -159,9 +159,14 @@ function add_bucket($name, $repo) {
     }
     ensure $bucketsdir | Out-Null
     $dir = ensure $dir
-    Invoke-Git -ArgumentList @('clone', $repo, $dir, '-q', '--depth=1')
+    $out = Invoke-Git -ArgumentList @('clone', $repo, $dir, '-q', '--depth=1')
+    if ($LASTEXITCODE -ne 0) {
+        error "Failed to clone '$repo' to '$dir'.`n`nError given:`n$out`n`nPlease check the repository URL or network connection and try again."
+        Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        return 1
+    }
     Write-Host 'OK'
-    if (get_config USE_SQLITE_CACHE $true) {
+    if (get_config USE_SQLITE_CACHE) {
         info 'Updating cache...'
         Set-ScoopDB -Path (Get-ChildItem (Find-BucketDirectory $name) -Filter '*.json' -Recurse).FullName
     }
@@ -177,7 +182,7 @@ function rm_bucket($name) {
     }
 
     Remove-Item $dir -Recurse -Force -ErrorAction Stop
-    if (get_config USE_SQLITE_CACHE $true) {
+    if (get_config USE_SQLITE_CACHE) {
         info 'Updating cache...'
         Remove-ScoopDBItem -Bucket $name
     }

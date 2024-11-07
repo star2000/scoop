@@ -1,5 +1,5 @@
 {
-    "apps": "https://github.com/kkzzhizhou/scoop-apps",
+    "apps": "https://github.com/star2000/scoop-apps",
     "main": "https://github.com/ScoopInstaller/Main",
     "extras": "https://github.com/ScoopInstaller/Extras",
     "versions": "https://github.com/ScoopInstaller/Versions",

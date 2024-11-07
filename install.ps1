@@ -736,11 +736,11 @@ $SCOOP_CONFIG_FILE = "$SCOOP_CONFIG_HOME\scoop\config.json"
 # TODO: Use a specific version of Scoop and the main bucket
 $SCOOP_PACKAGE_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop/archive/master.zip'
 $SCOOP_MAIN_BUCKET_REPO = ConvertTo-MirrorUrl 'https://github.com/ScoopInstaller/Main/archive/master.zip'
-$SCOOP_APPS_BUCKET_REPO = ConvertTo-MirrorUrl 'https://github.com/kkzzhizhou/scoop-apps/archive/master.zip'
+$SCOOP_APPS_BUCKET_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop-apps/archive/master.zip'
 
 $SCOOP_PACKAGE_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop.git'
 $SCOOP_MAIN_BUCKET_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/ScoopInstaller/Main.git'
-$SCOOP_APPS_BUCKET_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/kkzzhizhou/scoop-apps.git'
+$SCOOP_APPS_BUCKET_GIT_REPO = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop-apps.git'
 
 # Quit if anything goes wrong
 $oldErrorActionPreference = $ErrorActionPreference

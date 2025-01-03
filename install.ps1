@@ -224,46 +224,6 @@ function Test-isFileLocked {
     }
 }
 
-function Expand-ZipArchive {
-    param(
-        [String] $path,
-        [String] $to
-    )
-
-    if (!(Test-Path $path)) {
-        Deny-Install "Unzip failed: can't find $path to unzip."
-    }
-
-    # Check if the zip file is locked, by antivirus software for example
-    $retries = 0
-    while ($retries -le 10) {
-        if ($retries -eq 10) {
-            Deny-Install "Unzip failed: can't unzip because a process is locking the file."
-        }
-        if (Test-isFileLocked $path) {
-            Write-InstallInfo "Waiting for $path to be unlocked by another process... ($retries/10)"
-            $retries++
-            Start-Sleep -Seconds 2
-        } else {
-            break
-        }
-    }
-
-    # Workaround to suspend Expand-Archive verbose output,
-    # upstream issue: https://github.com/PowerShell/Microsoft.PowerShell.Archive/issues/98
-    $oldVerbosePreference = $VerbosePreference
-    $global:VerbosePreference = 'SilentlyContinue'
-
-    # Disable progress bar to gain performance
-    $oldProgressPreference = $ProgressPreference
-    $global:ProgressPreference = 'SilentlyContinue'
-
-    # PowerShell 5+: use Expand-Archive to extract zip files
-    Microsoft.PowerShell.Archive\Expand-Archive -Path $path -DestinationPath $to -Force
-    $global:VerbosePreference = $oldVerbosePreference
-    $global:ProgressPreference = $oldProgressPreference
-}
-
 function Out-UTF8File {
     param(
         [Parameter(Mandatory = $True, Position = 0)]
@@ -636,18 +596,18 @@ function Install-Scoop {
         # 1. extract scoop
         $scoopUnzipTempDir = "$SCOOP_APP_DIR\_tmp"
         Write-Verbose "Extracting $scoopZipfile to $scoopUnzipTempDir"
-        Expand-ZipArchive $scoopZipfile $scoopUnzipTempDir
+        Expand-Archive $scoopZipfile $scoopUnzipTempDir
         Copy-Item "$scoopUnzipTempDir\scoop-*\*" $SCOOP_APP_DIR -Recurse -Force
         # 2. extract scoop main bucket
         $scoopMainUnzipTempDir = "$SCOOP_MAIN_BUCKET_DIR\_tmp"
         Write-Verbose "Extracting $scoopMainZipfile to $scoopMainUnzipTempDir"
-        Expand-ZipArchive $scoopMainZipfile $scoopMainUnzipTempDir
+        Expand-Archive $scoopMainZipfile $scoopMainUnzipTempDir
         Copy-Item "$scoopMainUnzipTempDir\Main-*\*" $SCOOP_MAIN_BUCKET_DIR -Recurse -Force
         # 3. extract scoop apps bucket
         $scoopAppsUnzipTempDir = "$SCOOP_APPS_BUCKET_DIR\_tmp"
         Write-Verbose "Extracting $scoopAppsZipfile to $scoopAppsUnzipTempDir"
-        Expand-ZipArchive $scoopAppsZipfile $scoopAppsUnzipTempDir
-        Copy-Item "$scoopAppsUnzipTempDir\Apps-*\*" $SCOOP_APPS_BUCKET_DIR -Recurse -Force
+        Expand-Archive $scoopAppsZipfile $scoopAppsUnzipTempDir
+        Copy-Item "$scoopAppsUnzipTempDir\scoop-apps-*\*" $SCOOP_APPS_BUCKET_DIR -Recurse -Force
 
         # Cleanup
         Remove-Item $scoopUnzipTempDir -Recurse -Force

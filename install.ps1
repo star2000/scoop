@@ -48,8 +48,6 @@
     Specifies credential for the given proxy.
 .PARAMETER ProxyUseDefaultCredentials
     Use the credentials of the current user for the proxy server that is specified by the -Proxy parameter.
-.PARAMETER RunAsAdmin
-    Force to run the installer as administrator.
 .LINK
     https://scoop.sh
 .LINK
@@ -62,8 +60,7 @@ param(
     [Switch] $NoProxy,
     [Uri] $Proxy,
     [System.Management.Automation.PSCredential] $ProxyCredential,
-    [Switch] $ProxyUseDefaultCredentials,
-    [Switch] $RunAsAdmin
+    [Switch] $ProxyUseDefaultCredentials
 )
 
 # Disable StrictMode in this script
@@ -135,15 +132,6 @@ function Test-Prerequisite {
     # Ensure Robocopy.exe is accessible
     if (!(Test-CommandAvailable('robocopy'))) {
         Deny-Install "Scoop requires 'C:\Windows\System32\Robocopy.exe' to work. Please make sure 'C:\Windows\System32' is in your PATH."
-    }
-
-    # Detect if RunAsAdministrator, there is no need to run as administrator when installing Scoop
-    if (!$RunAsAdmin -and (Test-IsAdministrator)) {
-        # Exception: Windows Sandbox, GitHub Actions CI
-        $exception = ($env:USERNAME -eq 'WDAGUtilityAccount') -or ($env:GITHUB_ACTIONS -eq 'true' -and $env:CI -eq 'true')
-        if (!$exception) {
-            Deny-Install 'Running the installer as administrator is disabled by default, see https://github.com/ScoopInstaller/Install#for-admin for details.'
-        }
     }
 
     # Show notification to change execution policy

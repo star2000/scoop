@@ -648,8 +648,8 @@ function Write-DebugInfo {
 
 function ConvertTo-MirrorUrl ($Url) {
     $map = @{
-        '//github.com/'                = '//www.ghproxy.cn/https://github.com/';
-        '//raw.githubusercontent.com/' = '//www.ghproxy.cn/https://raw.githubusercontent.com/'
+        '//github.com/'                = '//ghfast.top/https://github.com/';
+        '//raw.githubusercontent.com/' = '//ghfast.top/https://raw.githubusercontent.com/'
     }
     if ($map.Keys | Where-Object { $Url -match $_ }) {
         if ($null -eq $env:SCOOP_INGFW) {

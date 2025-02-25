@@ -11,7 +11,7 @@
 ## 安装
 
 ```powershell
-Set-ExecutionPolicy rem -s c;iwr -useb https://www.ghproxy.cn/https://raw.githubusercontent.com/star2000/scoop/master/install.ps1 | iex
+Set-ExecutionPolicy rem -s c;iwr -useb https://ghfast.top/https://raw.githubusercontent.com/star2000/scoop/master/install.ps1 | iex
 ```
 
 ## 用法

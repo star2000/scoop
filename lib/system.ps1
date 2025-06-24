@@ -82,6 +82,7 @@ function Split-PathLikeEnvVar {
     if ($null -eq $Path -and $Path -eq '') {
         return $null, $null
     } else {
+        $Pattern = "$Pattern"
         $splitPattern = $Pattern.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)
         $splitPath = $Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)
         $inPath = @()

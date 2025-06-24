@@ -1479,9 +1479,11 @@ $scoopConfig = load_cfg $configFile
 
 # Scoop root directory
 $scoopdir = $env:SCOOP, (get_config ROOT_PATH), "$PSScriptRoot\..\..\..\..", "$([System.Environment]::GetFolderPath('UserProfile'))\scoop" | Where-Object { $_ } | Select-Object -First 1 | Get-AbsolutePath
+$scoopdir = $scoopdir.TrimEnd('\')
 
 # Scoop global apps directory
 $globaldir = $env:SCOOP_GLOBAL, (get_config GLOBAL_PATH), "$([System.Environment]::GetFolderPath('CommonApplicationData'))\scoop" | Where-Object { $_ } | Select-Object -First 1 | Get-AbsolutePath
+$globaldir = $globaldir.TrimEnd('\')
 
 # Scoop cache directory
 # Note: Setting the SCOOP_CACHE environment variable to use a shared directory

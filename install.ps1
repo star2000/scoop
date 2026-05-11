@@ -584,7 +584,7 @@ function Install-Scoop {
         $old_https = $env:HTTPS_PROXY
         $old_http = $env:HTTP_PROXY
         try {
-            if ($downloader.Proxy) {
+            if ($downloader.Proxy.Address) {
                 #define env vars for git when behind a proxy
                 $Env:HTTP_PROXY = $downloader.Proxy.Address
                 $Env:HTTPS_PROXY = $downloader.Proxy.Address

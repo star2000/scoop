@@ -24,6 +24,7 @@
 . "$PSScriptRoot\..\lib\versions.ps1"
 . "$PSScriptRoot\..\lib\depends.ps1"
 . "$PSScriptRoot\..\lib\install.ps1"
+. "$PSScriptRoot\..\lib\download.ps1"
 if (get_config USE_SQLITE_CACHE) {
     . "$PSScriptRoot\..\lib\database.ps1"
 }
@@ -44,7 +45,6 @@ if (!$configRepo) {
     $configRepo = ConvertTo-MirrorUrl 'https://github.com/star2000/scoop'
     set_config SCOOP_REPO $configRepo | Out-Null
 }
-$configRepo = $configRepo
 
 # Find current update channel from config
 $configBranch = get_config SCOOP_BRANCH

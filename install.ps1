@@ -85,20 +85,38 @@ function Write-InstallInfo {
     $host.UI.RawUI.ForegroundColor = $backup
 }
 
-function Deny-Install {
+function Exit-Install {
     param(
-        [String] $message,
-        [Int] $errorCode = 1
+        [Int] $ErrorCode = 1
     )
 
-    Write-InstallInfo -String $message -ForegroundColor DarkRed
-    Write-InstallInfo 'Abort.'
-
-    # Don't abort if invoked with iex that would close the PS session
     if ($IS_EXECUTED_FROM_IEX) {
+        # Don't abort with `exit` that would close the PS session if invoked
+        # with iex, yet set `LASTEXITCODE` for the caller to check
+        $Global:LASTEXITCODE = $ErrorCode
         break
     } else {
-        exit $errorCode
+        exit $ErrorCode
+    }
+}
+
+function Deny-Install {
+    param(
+        [String] $Message,
+        [Int] $ErrorCode = 1
+    )
+
+    Write-InstallInfo -String $Message -ForegroundColor DarkRed
+    Write-InstallInfo 'Abort.'
+    Exit-Install -ErrorCode $ErrorCode
+}
+
+function Test-LanguageMode {
+    if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') {
+        # `Write-InstallInfo` cannot be used here as it depends on FullLanguage mode
+        Write-Output 'Scoop requires PowerShell FullLanguage mode to run, current PowerShell environment is restricted.'
+        Write-Output 'Abort.'
+        Exit-Install
     }
 }
 
@@ -162,7 +180,7 @@ function Optimize-SecurityProtocol {
 function Get-Downloader {
     $downloadSession = New-Object System.Net.WebClient
 
-    # Set proxy to null if NoProxy is specificed
+    # Set proxy to null if NoProxy is specified
     if ($NoProxy) {
         $downloadSession.Proxy = $null
     } elseif ($Proxy) {
@@ -210,6 +228,46 @@ function Test-isFileLocked {
         # The file is locked by a process.
         return $true
     }
+}
+
+function Expand-ZipArchive {
+    param(
+        [String] $path,
+        [String] $to
+    )
+
+    if (!(Test-Path $path)) {
+        Deny-Install "Unzip failed: can't find $path to unzip."
+    }
+
+    # Check if the zip file is locked, by antivirus software for example
+    $retries = 0
+    while ($retries -le 10) {
+        if ($retries -eq 10) {
+            Deny-Install "Unzip failed: can't unzip because a process is locking the file."
+        }
+        if (Test-isFileLocked $path) {
+            Write-InstallInfo "Waiting for $path to be unlocked by another process... ($retries/10)"
+            $retries++
+            Start-Sleep -Seconds 2
+        } else {
+            break
+        }
+    }
+
+    # Workaround to suspend Expand-Archive verbose output,
+    # upstream issue: https://github.com/PowerShell/Microsoft.PowerShell.Archive/issues/98
+    $oldVerbosePreference = $VerbosePreference
+    $global:VerbosePreference = 'SilentlyContinue'
+
+    # Disable progress bar to gain performance
+    $oldProgressPreference = $ProgressPreference
+    $global:ProgressPreference = 'SilentlyContinue'
+
+    # PowerShell 5+: use Expand-Archive to extract zip files
+    Microsoft.PowerShell.Archive\Expand-Archive -Path $path -DestinationPath $to -Force
+    $global:VerbosePreference = $oldVerbosePreference
+    $global:ProgressPreference = $oldProgressPreference
 }
 
 function Out-UTF8File {
@@ -387,7 +445,7 @@ function Add-ShimsDirToPath {
         }
 
         if (!($h -eq '\')) {
-            $friendlyPath = "$SCOOP_SHIMS_DIR" -Replace ([Regex]::Escape($h)), '~\'
+            $friendlyPath = "$SCOOP_SHIMS_DIR" -replace ([Regex]::Escape($h)), '~\'
             Write-InstallInfo "Adding $friendlyPath to your path."
         } else {
             Write-InstallInfo "Adding $SCOOP_SHIMS_DIR to your path."
@@ -486,7 +544,7 @@ function Add-DefaultConfig {
         }
     }
 
-    # save current datatime to last_update
+    # save current datetime to last_update
     Add-Config -Name 'last_update' -Value ([System.DateTime]::Now.ToString('o')) | Out-Null
 }
 
@@ -533,23 +591,23 @@ function Install-Scoop {
             }
             Write-Verbose "Cloning $SCOOP_PACKAGE_GIT_REPO to $SCOOP_APP_DIR"
             git clone -q --depth=1 $SCOOP_PACKAGE_GIT_REPO $SCOOP_APP_DIR
-            if (-Not $?) {
+            if (-not $?) {
                 throw 'Cloning failed. Falling back to downloading zip files.'
             }
             Write-Verbose "Cloning $SCOOP_MAIN_BUCKET_GIT_REPO to $SCOOP_MAIN_BUCKET_DIR"
             git clone -q --depth=1 $SCOOP_MAIN_BUCKET_GIT_REPO $SCOOP_MAIN_BUCKET_DIR
-            if (-Not $?) {
+            if (-not $?) {
                 throw 'Cloning failed. Falling back to downloading zip files.'
             }
             Write-Verbose "Cloning $SCOOP_APPS_BUCKET_GIT_REPO to $SCOOP_APPS_BUCKET_DIR"
             git clone -q --depth=1 $SCOOP_APPS_BUCKET_GIT_REPO $SCOOP_APPS_BUCKET_DIR
-            if (-Not $?) {
+            if (-not $?) {
                 throw 'Cloning failed. Falling back to downloading zip files.'
             }
             $downloadZipsRequired = $False
         } catch {
             Write-Warning "$($_.Exception.Message)"
-            $Global:LastExitCode = 0
+            $Global:LASTEXITCODE = 0
         } finally {
             $env:HTTPS_PROXY = $old_https
             $env:HTTP_PROXY = $old_http
@@ -584,12 +642,12 @@ function Install-Scoop {
         # 1. extract scoop
         $scoopUnzipTempDir = "$SCOOP_APP_DIR\_tmp"
         Write-Verbose "Extracting $scoopZipfile to $scoopUnzipTempDir"
-        Expand-Archive $scoopZipfile $scoopUnzipTempDir
+        Expand-ZipArchive $scoopZipfile $scoopUnzipTempDir
         Copy-Item "$scoopUnzipTempDir\scoop-*\*" $SCOOP_APP_DIR -Recurse -Force
         # 2. extract scoop main bucket
         $scoopMainUnzipTempDir = "$SCOOP_MAIN_BUCKET_DIR\_tmp"
         Write-Verbose "Extracting $scoopMainZipfile to $scoopMainUnzipTempDir"
-        Expand-Archive $scoopMainZipfile $scoopMainUnzipTempDir
+        Expand-ZipArchive $scoopMainZipfile $scoopMainUnzipTempDir
         Copy-Item "$scoopMainUnzipTempDir\Main-*\*" $SCOOP_MAIN_BUCKET_DIR -Recurse -Force
         # 3. extract scoop apps bucket
         $scoopAppsUnzipTempDir = "$SCOOP_APPS_BUCKET_DIR\_tmp"
@@ -607,7 +665,7 @@ function Install-Scoop {
     }
     # Create the scoop shim
     Import-ScoopShim
-    # Finially ensure scoop shims is in the PATH
+    # Ensure scoop shims is in the PATH
     Add-ShimsDirToPath
     # Setup initial configuration of Scoop
     Add-DefaultConfig
@@ -662,6 +720,9 @@ function ConvertTo-MirrorUrl ($Url) {
 
 # Prepare variables
 $IS_EXECUTED_FROM_IEX = ($null -eq $MyInvocation.MyCommand.Path)
+
+# Abort when the language mode is restricted
+Test-LanguageMode
 
 # Scoop root directory
 $SCOOP_DIR = $ScoopDir, $env:SCOOP, "$env:USERPROFILE\scoop" | Where-Object { -not [String]::IsNullOrEmpty($_) } | Select-Object -First 1

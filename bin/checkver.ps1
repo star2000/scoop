@@ -53,12 +53,12 @@
 param(
     [String] $App = '*',
     [ValidateScript( {
-            if (!(Test-Path $_ -Type Container)) {
-                throw "$_ is not a directory!"
-            } else {
-                $true
-            }
-        })]
+        if (!(Test-Path $_ -Type Container)) {
+            throw "$_ is not a directory!"
+        } else {
+            $true
+        }
+    })]
     [String] $Dir,
     [Switch] $Update,
     [Switch] $ForceUpdate,
@@ -73,7 +73,7 @@ param(
 . "$PSScriptRoot\..\lib\buckets.ps1"
 . "$PSScriptRoot\..\lib\json.ps1"
 . "$PSScriptRoot\..\lib\versions.ps1"
-. "$PSScriptRoot\..\lib\install.ps1" # needed for hash generation
+. "$PSScriptRoot\..\lib\download.ps1"
 
 if ($App -ne '*' -and (Test-Path $App -PathType Leaf)) {
     $Dir = Split-Path $App
@@ -206,8 +206,7 @@ $Queue | ForEach-Object {
         $xpath = $json.checkver.xpath
     }
 
-    if ($json.checkver.replace -is [System.String]) {
-        # If `checkver` is [System.String], it has a method called `Replace`
+    if ($json.checkver.replace -is [System.String]) { # If `checkver` is [System.String], it has a method called `Replace`
         $replace = $json.checkver.replace
     }
 
@@ -321,7 +320,7 @@ while ($in_progress -gt 0) {
         if ($xpath) {
             $xml = [xml]$page
             # Find all `significant namespace declarations` from the XML file
-            $nsList = $xml.SelectNodes('//namespace::*[not(. = ../../namespace::*)]')
+            $nsList = $xml.SelectNodes("//namespace::*[not(. = ../../namespace::*)]")
             # Then add them into the NamespaceManager
             $nsmgr = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
             $nsList | ForEach-Object {
